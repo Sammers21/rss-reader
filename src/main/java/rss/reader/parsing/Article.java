@@ -13,13 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package rss.reader;
+package rss.reader.parsing;
 
-import io.vertx.core.Vertx;
+import java.util.Date;
 
-public class Main {
-    public static void main(String[] args) {
-        Vertx vertx = Vertx.vertx();
-        vertx.deployVerticle(new AppVerticle());
+public class Article {
+
+    public final Date pubDate;
+    public final String title;
+    public final String description;
+    public final String link;
+
+    public Article(Date pubDate, String title, String description, String link) {
+        this.pubDate = pubDate;
+        this.title = title;
+        this.description = description;
+        this.link = link;
     }
 }

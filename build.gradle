@@ -1,0 +1,22 @@
+plugins {
+    id 'java'
+    id 'application'
+}
+
+// Define the main class for the application
+mainClassName = 'rss.reader.App'
+
+def vertxVersion = '3.6.0-SNAPSHOT'
+
+dependencies {
+    compile "io.vertx:vertx-cassandra-client:$vertxVersion"
+    compile "io.vertx:vertx-web-client:$vertxVersion"
+    compile "io.vertx:vertx-web:$vertxVersion"
+    compile group: 'org.slf4j', name: 'slf4j-simple', version: '1.7.21'
+    testCompile 'junit:junit:4.12'
+}
+
+repositories {
+    maven { url "https://oss.sonatype.org/content/repositories/snapshots" }
+    mavenLocal()
+}
