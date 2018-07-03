@@ -15,13 +15,16 @@
  */
 package rss.reader;
 
+import com.datastax.driver.core.PreparedStatement;
 import com.datastax.driver.core.Row;
 import io.vertx.cassandra.CassandraClient;
 import io.vertx.cassandra.CassandraClientOptions;
 import io.vertx.cassandra.ResultSet;
 import io.vertx.core.AbstractVerticle;
+import io.vertx.core.CompositeFuture;
 import io.vertx.core.Future;
 import io.vertx.core.http.HttpServer;
+import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
@@ -30,6 +33,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 public class AppVerticle extends AbstractVerticle {
 
@@ -66,15 +70,50 @@ public class AppVerticle extends AbstractVerticle {
 
     private void getRssChannels(RoutingContext ctx) {
         String userId = ctx.request().getParam("user_id");
-        Future<List<Row>> future = Future.future();
-        future.setHandler(h -> {
-            if (h.succeeded()) {
+        if (userId == null) {
+            responseWithInvalidRequest(ctx);
+        } else {
+            Future<List<Row>> future = Future.future();
+            client.executeWithFullFetch(String.format("SELECT rss_link FROM rss_by_user WHERE login = '%s' ;", userId), future);
+            future.compose(rows -> {
+                List<String> links = rows.stream()
+                        .map(row -> row.getString(0))
+                        .collect(Collectors.toList());
+                Future<PreparedStatement> preparedStatementFuture = Future.future();
+                client.prepare("SELECT description, title, site_link, last_fetch_time FROM channel_info_by_rss_link WHERE rss_link = ? ;", preparedStatementFuture);
 
-            } else {
-                log.error("failed to get rss channels", h.cause());
-                ctx.response().setStatusCode(500).end("Unable to retrieve the info from C*");
-            }
-        });
+                Future<CompositeFuture> composed = preparedStatementFuture.compose(preparedStatement ->
+                        CompositeFuture.all(
+                                links.stream().map(preparedStatement::bind).map(statement -> {
+                                    Future<List<Row>> channelInfoRow = Future.future();
+                                    client.executeWithFullFetch(statement, channelInfoRow);
+                                    return channelInfoRow.map(selectedRows -> selectedRows.get(0));
+                                }).collect(Collectors.toList())
+                        ));
+
+                return composed;
+            }).setHandler(h -> {
+                if (h.succeeded()) {
+                    CompositeFuture result = h.result();
+                    List<Row> list = result.list();
+                    JsonObject responseJson = new JsonObject();
+                    JsonArray channels = new JsonArray();
+
+                    list.forEach(eachRow -> channels.add(
+                            new JsonObject()
+                                    .put("description", eachRow.getString(0))
+                                    .put("title", eachRow.getString(1))
+                                    .put("link", eachRow.getString(2))
+                    ));
+
+                    responseJson.put("channels", channels);
+                    ctx.response().end(responseJson.toString());
+                } else {
+                    log.error("failed to get rss channels", h.cause());
+                    ctx.response().setStatusCode(500).end("Unable to retrieve the info from C*");
+                }
+            });
+        }
     }
 
     private void postRssLink(RoutingContext ctx) {
