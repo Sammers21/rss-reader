@@ -32,24 +32,57 @@
                 channels_container.innerHTML = '';
 
                 for (var i = 0; i < channels.length; i++) {
-                    var descriptionFun = getDescription(channels[i].description);
+                    var channel = channels[i];
                     var btn = document.createElement("button");
-                    var button_text = document.createTextNode(descriptionFun());
+                    var button_text = document.createTextNode(channel.title);
                     btn.appendChild(button_text);
 
-                    function defineOnclick(channelJson){
+                    function defineOnclick(channelJson) {
                         var description = channelJson.description;
+                        var rss_link = channelJson.rss_link;
                         btn.onclick = function (ev) {
-                            console.log("clicked on " + descriptionFun())
+                            console.log("clicked on " + rss_link);
+                            loadArticlesForLink(rss_link)
                         };
                     }
-                    defineOnclick(channels[i]);
-                    document.getElementById("channels_container").appendChild(btn)
+
+                    defineOnclick(channel);
+                    channels_container.appendChild(btn)
                 }
             }
         };
 
         var request_url = "http://localhost:8080/user/" + login + "/rss_channels";
+        console.log("request url: " + request_url);
+        xhttp.open("GET", request_url, true);
+        xhttp.send();
+    }
+
+    function loadArticlesForLink(link) {
+        var xhttp = new XMLHttpRequest();
+        xhttp.onreadystatechange = function () {
+            if (this.readyState === 4 && this.status === 200) {
+                var articles = JSON.parse(this.responseText)['articles'];
+                var articles_container = document.getElementById("articles_container");
+                articles_container.innerHTML = '';
+                for (var i = 0; i < articles.length; i++) {
+                    var article = articles[i];
+                    var btn = document.createElement("button");
+                    var button_text = document.createTextNode(article.title);
+                    btn.appendChild(button_text);
+
+                    function defineOnclick(artcileJson) {
+                        btn.onclick = function (ev) {
+                            console.log("clicked on " + artcileJson.description);
+                        };
+                    }
+
+                    defineOnclick(article);
+                    articles_container.appendChild(btn)
+                }
+            }
+        };
+        var request_url = "http://localhost:8080/articles/by_rss_link?link=" + link;
         console.log("request url: " + request_url);
         xhttp.open("GET", request_url, true);
         xhttp.send();

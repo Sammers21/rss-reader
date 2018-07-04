@@ -118,7 +118,7 @@ public class AppVerticle extends AbstractVerticle {
                         .map(row -> row.getString(0))
                         .collect(Collectors.toList());
                 Future<PreparedStatement> preparedStatementFuture = Future.future();
-                client.prepare("SELECT description, title, site_link, last_fetch_time FROM channel_info_by_rss_link WHERE rss_link = ? ;", preparedStatementFuture);
+                client.prepare("SELECT description, title, site_link, rss_link FROM channel_info_by_rss_link WHERE rss_link = ? ;", preparedStatementFuture);
 
                 return preparedStatementFuture.compose(preparedStatement ->
                         CompositeFuture.all(
@@ -140,6 +140,7 @@ public class AppVerticle extends AbstractVerticle {
                                     .put("description", eachRow.getString(0))
                                     .put("title", eachRow.getString(1))
                                     .put("link", eachRow.getString(2))
+                                    .put("rss_link", eachRow.getString(3))
                     ));
 
                     responseJson.put("channels", channels);
