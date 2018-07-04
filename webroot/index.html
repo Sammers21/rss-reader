@@ -1,9 +1,60 @@
-<!DOCTYPE HTML>
+<!DOCTYPE html>
 <html>
 <head>
-    <title>Hello World! Site Title</title>
+    <script
+            src="https://code.jquery.com/jquery-3.3.1.js"
+            integrity="sha256-2Kok7MbOyxpgUVvAk/HJ2jigOSYS2auK4Pfzbm7uH60="
+            crossorigin="anonymous"></script>
 </head>
 <body>
-<h1>Hello World!</h1>
+
+<p>Input your login here:</p>
+<input type="text" id="input_login" value="Pavel"/>
+
+<div id="channels_container"></div>
+<div id="articles_container"></div>
+
+<script>
+    $('#input_login').keyup(function (e) {
+        if (e.keyCode === 13) {
+            var login = $('#input_login').val();
+            console.log("login is " + login);
+            loadChannelsFor(login)
+        }
+    });
+
+    function loadChannelsFor(login) {
+        var xhttp = new XMLHttpRequest();
+        xhttp.onreadystatechange = function () {
+            if (this.readyState === 4 && this.status === 200) {
+                var channels = JSON.parse(this.responseText)['channels'];
+                var channels_container = document.getElementById("channels_container");
+                channels_container.innerHTML = '';
+
+                for (var i = 0; i < channels.length; i++) {
+                    var descriptionFun = getDescription(channels[i].description);
+                    var btn = document.createElement("button");
+                    var button_text = document.createTextNode(descriptionFun());
+                    btn.appendChild(button_text);
+
+                    function defineOnclick(channelJson){
+                        var description = channelJson.description;
+                        btn.onclick = function (ev) {
+                            console.log("clicked on " + descriptionFun())
+                        };
+                    }
+                    defineOnclick(channels[i]);
+                    document.getElementById("channels_container").appendChild(btn)
+                }
+            }
+        };
+
+        var request_url = "http://localhost:8080/user/" + login + "/rss_channels";
+        console.log("request url: " + request_url);
+        xhttp.open("GET", request_url, true);
+        xhttp.send();
+    }
+</script>
+
 </body>
 </html>
