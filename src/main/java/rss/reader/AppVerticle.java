@@ -59,6 +59,11 @@ public class AppVerticle extends AbstractVerticle {
         HttpServer server = vertx.createHttpServer();
         Router router = Router.router(vertx);
 
+        router.route().handler(ctx->{
+            ctx.response().putHeader("Access-Control-Allow-Origin","*");
+            ctx.next();
+        });
+
         router.post("/user/:user_id/rss_link").handler(this::postRssLink);
         router.get("/user/:user_id/rss_channels").handler(this::getRssChannels);
         router.get("/articles/by_rss_link").handler(this::getArticles);
