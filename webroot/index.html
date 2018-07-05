@@ -8,6 +8,27 @@
 
 
     <style>
+
+        #login_input_container {
+            top: 0;
+            left: 5%;
+        }
+
+        .login_input_container {
+            position: fixed;
+            width: 10%;
+        }
+
+        #rss_input_container {
+            top: 0;
+            left: 15%;
+        }
+
+        .rss_input_container {
+            position: fixed;
+            width: 10%;
+        }
+
         #articles_container {
             top: 10%;
             left: 50%;
@@ -37,18 +58,47 @@
 </head>
 <body>
 
-<p>Input your login here:</p>
-<input type="text" id="input_login" value="Pavel"/>
+<div id="login_input_container" class="login_input_container">
+    <p>Input your login here:</p>
+    <input type="text" id="input_login" value="Pavel"/>
+</div>
+
+<div id="rss_input_container" class="rss_input_container">
+    <p>Input rss link here:</p>
+    <input type="text" id="input_rss_link" value=""/>
+</div>
 
 <div id="channels_container" class="channels_container"></div>
 <div id="articles_container" class="articles_container"></div>
 
 <script>
+
+    function isURL(str) {
+        var pattern = new RegExp('^(https?:\\/\\/)?'+ // protocol
+            '((([a-z\\d]([a-z\\d-]*[a-z\\d])*)\\.?)+[a-z]{2,}|'+ // domain name
+            '((\\d{1,3}\\.){3}\\d{1,3}))'+ // OR ip (v4) address
+            '(\\:\\d+)?(\\/[-a-z\\d%_.~+]*)*'+ // port and path
+            '(\\?[;&a-z\\d%_.~+=-]*)?'+ // query string
+            '(\\#[-a-z\\d_]*)?$','i'); // fragment locator
+        return pattern.test(str);
+    }
+
     $('#input_login').keyup(function (e) {
         if (e.keyCode === 13) {
             var login = $('#input_login').val();
             console.log("login is " + login);
             loadChannelsFor(login)
+        }
+    });
+
+    $('#input_rss_link').keyup(function (e) {
+        if (e.keyCode === 13) {
+            var rss_link = $('#input_rss_link').val();
+            if (isURL(rss_link)) {
+                console.log("rss link is " + rss_link);
+            } else {
+                console.log("rss link: " + rss_link + " is invalid")
+            }
         }
     });
 
