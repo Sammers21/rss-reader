@@ -3,8 +3,12 @@ plugins {
     id 'application'
 }
 
+compileJava {
+    options.compilerArgs << '-Xlint:deprecation'
+}
+
 // Define the main class for the application
-mainClassName = 'rss.reader.App'
+mainClassName = 'rss.reader.Main'
 
 def vertxVersion = '3.6.0-SNAPSHOT'
 
