@@ -5,14 +5,43 @@
             src="https://code.jquery.com/jquery-3.3.1.js"
             integrity="sha256-2Kok7MbOyxpgUVvAk/HJ2jigOSYS2auK4Pfzbm7uH60="
             crossorigin="anonymous"></script>
+
+
+    <style>
+        #articles_container {
+            top: 10%;
+            left: 50%;
+        }
+
+        #channels_container {
+            top: 10%;
+            left: 0;
+        }
+
+        .channels_container {
+            position: fixed;
+            width: 50%;
+            display: grid;
+            grid-template-columns: auto;
+            padding: 10px;
+        }
+
+        .articles_container {
+            position: fixed;
+            width: 50%;
+            display: grid;
+            grid-template-columns: auto;
+            padding: 10px;
+        }
+    </style>
 </head>
 <body>
 
 <p>Input your login here:</p>
 <input type="text" id="input_login" value="Pavel"/>
 
-<div id="channels_container"></div>
-<div id="articles_container"></div>
+<div id="channels_container" class="channels_container"></div>
+<div id="articles_container" class="articles_container"></div>
 
 <script>
     $('#input_login').keyup(function (e) {
@@ -38,10 +67,10 @@
                     btn.appendChild(button_text);
 
                     function defineOnclick(channelJson) {
-                        var description = channelJson.description;
+                        var title = channelJson.title;
                         var rss_link = channelJson.rss_link;
                         btn.onclick = function (ev) {
-                            console.log("clicked on " + rss_link);
+                            console.log("clicked on channel " + title);
                             loadArticlesForLink(rss_link)
                         };
                     }
@@ -71,9 +100,9 @@
                     var button_text = document.createTextNode(article.title);
                     btn.appendChild(button_text);
 
-                    function defineOnclick(artcileJson) {
+                    function defineOnclick(articleJson) {
                         btn.onclick = function (ev) {
-                            console.log("clicked on " + artcileJson.description);
+                            console.log("clicked on article " + articleJson.title);
                         };
                     }
 
