@@ -6,7 +6,8 @@
             integrity="sha256-2Kok7MbOyxpgUVvAk/HJ2jigOSYS2auK4Pfzbm7uH60="
             crossorigin="anonymous"></script>
 
-    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+    <link rel="stylesheet"
+          href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
     <style>
 
         #login_input_container {
@@ -179,13 +180,28 @@
                 for (var i = 0; i < articles.length; i++) {
                     var article = articles[i];
                     var btn = document.createElement("button");
-                    var button_text = document.createTextNode(article.title);
-                    btn.appendChild(button_text);
+                    btn.href = article.link;
+                    var divWithTitle = document.createElement("div");
+                    var titleText = document.createTextNode(article.title);
+                    divWithTitle.appendChild(titleText);
+                    divWithTitle.style.fontWeight = 'bold';
+                    btn.appendChild(divWithTitle);
+
+                    var timestamp = article.pub_date;
+                    var dateFormTimestamp = new Date();
+                    dateFormTimestamp.setTime(timestamp);
+                    var divWithPubTime = document.createElement("div");
+                    var dateText = document.createTextNode("Published: " + dateFormTimestamp.toDateString());
+                    divWithPubTime.appendChild(dateText);
+                    divWithPubTime.style.fontSize = "smaller";
+                    divWithPubTime.style.float = 'left';
+                    btn.appendChild(divWithPubTime);
 
                     function defineOnclick(articleJson) {
+                        var link = articleJson.link;
                         btn.onclick = function (ev) {
-                            console.log("clicked on article " + articleJson.title);
-                        };
+                            location.href = link;
+                        }
                     }
 
                     defineOnclick(article);
