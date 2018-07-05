@@ -95,12 +95,34 @@
             var rss_link = $('#input_rss_link').val();
             if (isURL(rss_link)) {
                 console.log("rss link is " + rss_link);
+                var login = $('#input_login').val();
+                newRssLinkAdded(login, rss_link)
             } else {
                 alert("This is not valid link");
                 console.log("rss link: " + rss_link + " is invalid")
             }
         }
     });
+
+    function newRssLinkAdded(userId, rss_link) {
+        var xhr = new XMLHttpRequest();
+
+        var json = JSON.stringify({
+            "link": rss_link
+        });
+
+        var request_url = "http://localhost:8080/user/" + userId + "/rss_link";
+        console.log("POST on request url: " + request_url + " body: " + json);
+        xhr.open("POST", request_url, true);
+        xhr.setRequestHeader('Content-type', 'application/json; charset=utf-8');
+
+        xhr.onreadystatechange = function () {
+            if (this.readyState === 4 && this.status === 200) {
+
+            }
+        };
+        xhr.send(json);
+    }
 
     function loadChannelsFor(login) {
         var xhttp = new XMLHttpRequest();
