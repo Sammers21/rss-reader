@@ -6,6 +6,13 @@ This is the demo of how you can use [vertx-cassandra-client](https://github.com/
 ## Running
 
 1. Before running the example you should ensure that cassandra service running locally on port 9042.
+As a option you can run cassandra with [ccm](https://github.com/riptano/ccm#installation)(Cassandra Cluster Manager).
+Follow [this](https://github.com/riptano/ccm#installation) instructions for installing ccm.
+After installing you will be able to run a single node cluster:
+    ```bash
+    ccm create rss_reader -v 3.11.2 -n 1 -s
+    ccm start
+    ```
 
 2. Building [vertx-cassandra-client](https://github.com/Sammers21/vertx-cassandra-client) locally:
     ```bash
