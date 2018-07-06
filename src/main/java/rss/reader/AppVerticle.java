@@ -91,7 +91,7 @@ public class AppVerticle extends AbstractVerticle {
         router.get("/").handler(StaticHandler.create());
 
         Future<HttpServer> serverStarted = Future.future();
-        server.requestHandler(router::accept).listen(APP_PORT, serverStarted);
+        server.requestHandler(router).listen(APP_PORT, serverStarted);
         return serverStarted;
     }
 
