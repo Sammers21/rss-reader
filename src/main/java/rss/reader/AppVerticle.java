@@ -125,13 +125,16 @@ public class AppVerticle extends AbstractVerticle {
                                 links.stream().map(preparedStatement::bind).map(statement -> {
                                     Future<List<Row>> channelInfoRow = Future.future();
                                     client.executeWithFullFetch(statement, channelInfoRow);
-                                    return channelInfoRow.map(selectedRows -> selectedRows.get(0));
+                                    return channelInfoRow;
                                 }).collect(Collectors.toList())
                         ));
             }).setHandler(h -> {
                 if (h.succeeded()) {
                     CompositeFuture result = h.result();
-                    List<Row> list = result.list();
+                    List<List<Row>> results = result.list();
+                    List<Row> list = results.stream()
+                            .flatMap(List::stream)
+                            .collect(Collectors.toList());
                     JsonObject responseJson = new JsonObject();
                     JsonArray channels = new JsonArray();
 
