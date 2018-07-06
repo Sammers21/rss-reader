@@ -11,12 +11,10 @@ compileJava {
 // Define the main class for the application
 mainClassName = 'rss.reader.Main'
 
-def vertxVersion = '3.6.0-SNAPSHOT'
-
 dependencies {
-    compile "io.vertx:vertx-cassandra-client:$vertxVersion"
-    compile "io.vertx:vertx-web-client:$vertxVersion"
-    compile "io.vertx:vertx-web:$vertxVersion"
+    compile "io.vertx:vertx-cassandra-client:3.6.0-SNAPSHOT"
+    compile "io.vertx:vertx-web-client"
+    compile "io.vertx:vertx-web"
     compile group: 'org.slf4j', name: 'slf4j-simple', version: '1.7.21'
     testCompile 'junit:junit:4.12'
 }
@@ -28,4 +26,5 @@ repositories {
 
 vertx {
     mainVerticle = 'rss.reader.AppVerticle'
+    vertxVersion = '3.6.0-SNAPSHOT'
 }
