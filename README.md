@@ -22,6 +22,8 @@ After installing you will be able to run a single node cluster:
     ```
 3. Running the app
     ```bash
-    ./gradlew run
+    ./gradlew vertxRun
     ```
+    You may also noted that we are using [vertx-gradle-plugin](https://github.com/jponge/vertx-gradle-plugin) for running the app.
+    It means that the app will be reloaded automatically when code changes.
 4. Now you can open your browser and go to `localhost:8080`

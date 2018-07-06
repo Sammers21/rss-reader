@@ -1,6 +1,7 @@
 plugins {
     id 'java'
     id 'application'
+    id 'io.vertx.vertx-plugin' version '0.0.8'
 }
 
 compileJava {
@@ -23,4 +24,8 @@ dependencies {
 repositories {
     maven { url "https://oss.sonatype.org/content/repositories/snapshots" }
     mavenLocal()
+}
+
+vertx {
+    mainVerticle = 'rss.reader.AppVerticle'
 }
