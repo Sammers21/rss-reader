@@ -15,14 +15,17 @@
  */
 package rss.reader;
 
+import com.datastax.driver.core.BatchStatement;
 import com.datastax.driver.core.PreparedStatement;
 import com.datastax.driver.core.Row;
+import com.datastax.driver.core.SimpleStatement;
 import io.vertx.cassandra.CassandraClient;
 import io.vertx.cassandra.CassandraClientOptions;
 import io.vertx.cassandra.ResultSet;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.CompositeFuture;
 import io.vertx.core.Future;
+import io.vertx.core.buffer.Buffer;
 import io.vertx.core.http.HttpServer;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
@@ -49,9 +52,27 @@ public class AppVerticle extends AbstractVerticle {
     public void start(Future<Void> startFuture) {
         client = CassandraClient.create(vertx, new CassandraClientOptions().addContactPoint(CASSANDRA_HOST).setPort(CASSANDRA_PORT));
         Future<Void> future = Future.future();
-        client.connect("rss_reader", future);
-        future.compose(connected -> startHttpServer())
+        client.connect( future);
+        future.compose(connected -> initKeyspaceIfNotExist())
+                .compose(initialized -> startHttpServer())
                 .compose(serverStarted -> vertx.deployVerticle(new FetchVerticle(client)), startFuture);
+    }
+
+    private Future<Void> initKeyspaceIfNotExist() {
+        Future<Buffer> readFileFuture = Future.future();
+        vertx.fileSystem().readFile("schema.cql", readFileFuture);
+        return readFileFuture.compose(file -> {
+            String[] statements = file.toString().split("\n");
+            Future<ResultSet> result = Future.succeededFuture();
+            for (String statement : statements) {
+                result = result.compose(f -> {
+                    Future<ResultSet> executionQueryFuture = Future.future();
+                    client.execute(statement, executionQueryFuture);
+                    return executionQueryFuture;
+                });
+            }
+            return result;
+        }).mapEmpty();
     }
 
     @SuppressWarnings("UnusedReturnValue")
