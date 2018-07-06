@@ -20,7 +20,7 @@ After installing you will be able to run a single node cluster:
     cd vertx-cassandra-client
     mvn clean install -Dmaven.test.skip=true -s .travis.maven.settings.xml 
     ```
-3. Running the app
+3. Running the app:
     ```bash
     ./gradlew vertxRun
     ```
