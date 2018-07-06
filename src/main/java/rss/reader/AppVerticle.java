@@ -16,6 +16,7 @@
 package rss.reader;
 
 import com.datastax.driver.core.BatchStatement;
+import com.datastax.driver.core.BoundStatement;
 import com.datastax.driver.core.PreparedStatement;
 import com.datastax.driver.core.Row;
 import com.datastax.driver.core.SimpleStatement;
@@ -35,6 +36,7 @@ import io.vertx.ext.web.handler.StaticHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.lang.ref.Reference;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -48,14 +50,24 @@ public class AppVerticle extends AbstractVerticle {
 
     private CassandraClient client;
 
+    private PreparedStatement selectChannelInfo;
+    private PreparedStatement selectRssLinksByLogin;
+    private PreparedStatement insertNewLinkForUser;
+    private PreparedStatement selectArticlesByRssLink;
+
     @Override
     public void start(Future<Void> startFuture) {
         client = CassandraClient.create(vertx, new CassandraClientOptions().addContactPoint(CASSANDRA_HOST).setPort(CASSANDRA_PORT));
         Future<Void> future = Future.future();
-        client.connect( future);
+        client.connect(future);
         future.compose(connected -> initKeyspaceIfNotExist())
-                .compose(initialized -> startHttpServer())
-                .compose(serverStarted -> vertx.deployVerticle(new FetchVerticle(client)), startFuture);
+                .compose(keySpacesInitialized -> prepareNecessaryQueries())
+                .compose(all -> {
+                    Future<String> deployed = Future.future();
+                    vertx.deployVerticle(new FetchVerticle(client), deployed);
+                    return deployed;
+                })
+                .compose(deployed -> startHttpServer(), startFuture);
     }
 
     private Future<Void> initKeyspaceIfNotExist() {
@@ -73,6 +85,39 @@ public class AppVerticle extends AbstractVerticle {
             }
             return result;
         }).mapEmpty();
+    }
+
+    private Future<Void> prepareNecessaryQueries() {
+        Future<PreparedStatement> selectChannelInfoPrepFuture = Future.future();
+        client.prepare("SELECT description, title, site_link, rss_link FROM channel_info_by_rss_link WHERE rss_link = ? ;", selectChannelInfoPrepFuture);
+
+        Future<PreparedStatement> selectRssLinkByLoginPrepFuture = Future.future();
+        client.prepare("SELECT rss_link FROM rss_by_user WHERE login = ? ;", selectRssLinkByLoginPrepFuture);
+
+        Future<PreparedStatement> insertNewLinkForUserPrepFuture = Future.future();
+        client.prepare("INSERT INTO rss_by_user (login , rss_link ) VALUES ( ?, ?);", insertNewLinkForUserPrepFuture);
+
+        Future<PreparedStatement> selectArticlesByRssLinkPrepFuture = Future.future();
+        client.prepare("SELECT title, article_link, description, pubDate FROM articles_by_rss_link WHERE rss_link = ? ;", selectArticlesByRssLinkPrepFuture);
+
+        return CompositeFuture.all(
+                selectChannelInfoPrepFuture.compose(preparedStatement -> {
+                    selectChannelInfo = preparedStatement;
+                    return Future.succeededFuture();
+                }),
+                selectRssLinkByLoginPrepFuture.compose(preparedStatement -> {
+                    selectRssLinksByLogin = preparedStatement;
+                    return Future.succeededFuture();
+                }),
+                insertNewLinkForUserPrepFuture.compose(preparedStatement -> {
+                    insertNewLinkForUser = preparedStatement;
+                    return Future.succeededFuture();
+                }),
+                selectArticlesByRssLinkPrepFuture.compose(preparedStatement -> {
+                    selectArticlesByRssLink = preparedStatement;
+                    return Future.succeededFuture();
+                })
+        ).mapEmpty();
     }
 
     @SuppressWarnings("UnusedReturnValue")
@@ -101,7 +146,7 @@ public class AppVerticle extends AbstractVerticle {
             responseWithInvalidRequest(ctx);
         } else {
             Future<List<Row>> future = Future.future();
-            client.executeWithFullFetch(String.format("SELECT title, article_link, description, pubDate FROM articles_by_rss_link WHERE rss_link = '%s' ;", link), future);
+            client.executeWithFullFetch(selectArticlesByRssLink.bind(link), future);
             future.setHandler(handler -> {
                 if (handler.succeeded()) {
                     List<Row> rows = handler.result();
@@ -133,22 +178,19 @@ public class AppVerticle extends AbstractVerticle {
             responseWithInvalidRequest(ctx);
         } else {
             Future<List<Row>> future = Future.future();
-            client.executeWithFullFetch(String.format("SELECT rss_link FROM rss_by_user WHERE login = '%s' ;", userId), future);
+            client.executeWithFullFetch(selectRssLinksByLogin.bind(userId), future);
             future.compose(rows -> {
                 List<String> links = rows.stream()
                         .map(row -> row.getString(0))
                         .collect(Collectors.toList());
-                Future<PreparedStatement> preparedStatementFuture = Future.future();
-                client.prepare("SELECT description, title, site_link, rss_link FROM channel_info_by_rss_link WHERE rss_link = ? ;", preparedStatementFuture);
 
-                return preparedStatementFuture.compose(preparedStatement ->
-                        CompositeFuture.all(
-                                links.stream().map(preparedStatement::bind).map(statement -> {
-                                    Future<List<Row>> channelInfoRow = Future.future();
-                                    client.executeWithFullFetch(statement, channelInfoRow);
-                                    return channelInfoRow;
-                                }).collect(Collectors.toList())
-                        ));
+                return CompositeFuture.all(
+                        links.stream().map(selectChannelInfo::bind).map(statement -> {
+                            Future<List<Row>> channelInfoRow = Future.future();
+                            client.executeWithFullFetch(statement, channelInfoRow);
+                            return channelInfoRow;
+                        }).collect(Collectors.toList())
+                );
             }).setHandler(h -> {
                 if (h.succeeded()) {
                     CompositeFuture result = h.result();
@@ -187,7 +229,7 @@ public class AppVerticle extends AbstractVerticle {
             } else {
                 vertx.eventBus().send("fetch.rss.link", link);
                 Future<ResultSet> future = Future.future();
-                String query = String.format("INSERT INTO rss_by_user (login , rss_link ) VALUES ( '%s', '%s');", userId, link);
+                BoundStatement query = insertNewLinkForUser.bind(userId, link);
                 client.execute(query, future);
                 future.setHandler(result -> {
                     if (result.succeeded()) {
