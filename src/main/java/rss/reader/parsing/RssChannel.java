@@ -24,11 +24,10 @@ import org.xml.sax.InputSource;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import java.io.StringReader;
-import java.text.SimpleDateFormat;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
-import java.util.Locale;
 
 public class RssChannel {
 
@@ -38,7 +37,7 @@ public class RssChannel {
 
     public List<Article> articles;
 
-    private static final SimpleDateFormat PUB_DATE_FORMAT = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz", Locale.ENGLISH);
+    private static final DateTimeFormatter PUB_DATE_FORMAT = DateTimeFormatter.RFC_1123_DATE_TIME;
 
     public RssChannel(String xml) throws Exception {
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
@@ -63,7 +62,7 @@ public class RssChannel {
                         String link = itemNode.getElementsByTagName("link").item(0).getTextContent();
                         String description = itemNode.getElementsByTagName("description").item(0).getTextContent();
                         String title = itemNode.getElementsByTagName("title").item(0).getTextContent();
-                        Date pubDate = PUB_DATE_FORMAT.parse(itemNode.getElementsByTagName("pubDate").item(0).getTextContent());
+                        LocalDate pubDate = LocalDate.parse(itemNode.getElementsByTagName("pubDate").item(0).getTextContent(), PUB_DATE_FORMAT);
                         articles.add(new Article(pubDate, title, description, link));
                     }
                 }

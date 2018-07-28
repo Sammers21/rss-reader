@@ -15,6 +15,8 @@
  */
 package rss.reader.parsing;
 
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.Date;
 
 public class Article {
@@ -24,8 +26,8 @@ public class Article {
     public final String description;
     public final String link;
 
-    public Article(Date pubDate, String title, String description, String link) {
-        this.pubDate = pubDate;
+    public Article(LocalDate pubDate, String title, String description, String link) {
+        this.pubDate = Date.from(pubDate.atStartOfDay(ZoneId.systemDefault()).toInstant());
         this.title = title;
         this.description = description;
         this.link = link;
