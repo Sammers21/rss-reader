@@ -57,7 +57,7 @@ public class AppVerticle extends AbstractVerticle {
 
     @Override
     public void start(Future<Void> startFuture) {
-        client = CassandraClient.create(vertx, new CassandraClientOptions().addContactPoint(CASSANDRA_HOST).setPort(CASSANDRA_PORT));
+        client = CassandraClient.createShared(vertx, new CassandraClientOptions().addContactPoint(CASSANDRA_HOST).setPort(CASSANDRA_PORT));
         Future<Void> future = Future.future();
         client.connect(future);
         future.compose(connected -> initKeyspaceIfNotExist())
