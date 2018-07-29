@@ -18,7 +18,6 @@ package rss.reader;
 import com.datastax.driver.core.BatchStatement;
 import com.datastax.driver.core.BoundStatement;
 import com.datastax.driver.core.PreparedStatement;
-import com.datastax.driver.core.SimpleStatement;
 import io.vertx.cassandra.CassandraClient;
 import io.vertx.cassandra.ResultSet;
 import io.vertx.core.AbstractVerticle;
@@ -36,19 +35,16 @@ public class FetchVerticle extends AbstractVerticle {
 
     private static final Logger log = LoggerFactory.getLogger(FetchVerticle.class);
 
-    private final CassandraClient cassandraClient;
+    private CassandraClient cassandraClient;
     private WebClient webClient;
 
     private PreparedStatement insertChannelInfo;
     private PreparedStatement insertArticleInfo;
 
-    public FetchVerticle(CassandraClient cassandraClient) {
-        this.cassandraClient = cassandraClient;
-    }
-
     @Override
     public void start(Future<Void> startFuture) {
         webClient = WebClient.create(vertx);
+        cassandraClient = CassandraClient.createShared(vertx);
         startFetchEventBusConsumer();
         prepareNecessaryQueries().setHandler(startFuture);
     }

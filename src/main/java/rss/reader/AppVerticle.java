@@ -15,11 +15,9 @@
  */
 package rss.reader;
 
-import com.datastax.driver.core.BatchStatement;
 import com.datastax.driver.core.BoundStatement;
 import com.datastax.driver.core.PreparedStatement;
 import com.datastax.driver.core.Row;
-import com.datastax.driver.core.SimpleStatement;
 import io.vertx.cassandra.CassandraClient;
 import io.vertx.cassandra.CassandraClientOptions;
 import io.vertx.cassandra.ResultSet;
@@ -36,7 +34,6 @@ import io.vertx.ext.web.handler.StaticHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.lang.ref.Reference;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -64,7 +61,7 @@ public class AppVerticle extends AbstractVerticle {
                 .compose(keySpacesInitialized -> prepareNecessaryQueries())
                 .compose(all -> {
                     Future<String> deployed = Future.future();
-                    vertx.deployVerticle(new FetchVerticle(client), deployed);
+                    vertx.deployVerticle(new FetchVerticle(), deployed);
                     return deployed;
                 })
                 .compose(deployed -> startHttpServer(), startFuture);
