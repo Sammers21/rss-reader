@@ -1,7 +1,7 @@
 plugins {
     id 'java'
     id 'application'
-    id 'io.vertx.vertx-plugin' version '0.0.8'
+    id 'io.vertx.vertx-plugin' version '0.1.0'
 }
 
 compileJava {
