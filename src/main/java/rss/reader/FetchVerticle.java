@@ -15,21 +15,14 @@
  */
 package rss.reader;
 
-import com.datastax.driver.core.BatchStatement;
-import com.datastax.driver.core.BoundStatement;
 import com.datastax.driver.core.PreparedStatement;
 import io.vertx.cassandra.CassandraClient;
-import io.vertx.cassandra.ResultSet;
 import io.vertx.core.AbstractVerticle;
-import io.vertx.core.CompositeFuture;
 import io.vertx.core.Future;
 import io.vertx.ext.web.client.WebClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import rss.reader.parsing.Article;
 import rss.reader.parsing.RssChannel;
-
-import java.util.Date;
 
 public class FetchVerticle extends AbstractVerticle {
 
@@ -58,22 +51,8 @@ public class FetchVerticle extends AbstractVerticle {
                     String bodyAsString = response.result().bodyAsString("UTF-8");
                     try {
                         RssChannel rssChannel = new RssChannel(bodyAsString);
-                        BatchStatement batchStatement = new BatchStatement();
-                        BoundStatement channelInfoInsertQuery = insertChannelInfo.bind(
-                                rssLink, new Date(System.currentTimeMillis()), rssChannel.description, rssChannel.link, rssChannel.title
-                        );
-                        batchStatement.add(channelInfoInsertQuery);
 
-                        for (Article article: rssChannel.articles) {
-                            batchStatement.add(insertArticleInfo.bind(rssLink, article.pubDate, article.link, article.description, article.title));
-                        }
-                        Future<ResultSet> insertArticlesFuture = Future.future();
-                        cassandraClient.execute(batchStatement, insertArticlesFuture);
-
-                        insertArticlesFuture.compose(insertDone -> {
-                            message.reply(FetchStatus.SUCCESS);
-                            return Future.succeededFuture();
-                        });
+                        // TODO STEP 1
                     } catch (Exception e) {
                         e.printStackTrace();
                         message.reply(FetchStatus.FAIL);
@@ -87,20 +66,7 @@ public class FetchVerticle extends AbstractVerticle {
 
 
     private Future<Void> prepareNecessaryQueries() {
-        Future<PreparedStatement> insertChannelInfoPrepFuture = Future.future();
-        cassandraClient.prepare("INSERT INTO channel_info_by_rss_link ( rss_link , last_fetch_time, description , site_link , title ) VALUES (?, ?, ?, ?, ?);", insertChannelInfoPrepFuture);
-
-        Future<PreparedStatement> insertArticleInfoPrepFuture = Future.future();
-        cassandraClient.prepare("INSERT INTO articles_by_rss_link ( rss_link , pubdate , article_link , description , title ) VALUES ( ?, ?, ?, ?, ?);", insertArticleInfoPrepFuture);
-
-        return CompositeFuture.all(
-                insertChannelInfoPrepFuture.compose(preparedStatement -> {
-                    insertChannelInfo = preparedStatement;
-                    return Future.succeededFuture();
-                }), insertArticleInfoPrepFuture.compose(preparedStatement -> {
-                    insertArticleInfo = preparedStatement;
-                    return Future.succeededFuture();
-                })
-        ).mapEmpty();
+        // TODO STEP 1
+        return Future.succeededFuture();
     }
 }
