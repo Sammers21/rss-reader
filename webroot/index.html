@@ -116,30 +116,35 @@
     });
 
     function newRssLinkAdded(userId, rss_link) {
-        var xhr = new XMLHttpRequest();
-
+        var request_url = "http://localhost:8080/user/" + userId + "/rss_link";
         var json = JSON.stringify({
             "link": rss_link
         });
-
-        var request_url = "http://localhost:8080/user/" + userId + "/rss_link";
-        console.log("POST on request url: " + request_url + " body: " + json);
-        xhr.open("POST", request_url, true);
-        xhr.setRequestHeader('Content-type', 'application/json; charset=utf-8');
-
-        xhr.onreadystatechange = function () {
-            if (this.readyState === 4 && this.status === 200) {
+        $.ajax({
+            type: "POST",
+            data: json,
+            url: request_url,
+            dataType: "json",
+            contentType: "application/json; charset=utf-8",
+            success: function (data) {
                 setTimeout(refresh, 500)
+            },
+            error: function (error) {
+                // show the error details or show a user friendly error message
+                alert("Due to unexpected errors we were unable to load data");
+
             }
-        };
-        xhr.send(json);
+        });
+        console.log("POST on request url: " + request_url + " body: " + json);
     }
 
     function loadChannelsFor(login) {
-        var xhttp = new XMLHttpRequest();
-        xhttp.onreadystatechange = function () {
-            if (this.readyState === 4 && this.status === 200) {
-                var channels = JSON.parse(this.responseText)['channels'];
+        var request_url = "http://localhost:8080/user/" + login + "/rss_channels";
+        $.ajax({
+            type: "GET",
+            url: request_url,
+            success: function (data) {
+                var channels = JSON.parse(data)['channels'];
                 var channels_container = document.getElementById("channels_container");
                 channels_container.innerHTML = '';
 
@@ -161,20 +166,21 @@
                     defineOnclick(channel);
                     channels_container.appendChild(btn)
                 }
+            },
+            error: function (error) {
+                alert("Due to unexpected errors we were unable to load data");
             }
-        };
-
-        var request_url = "http://localhost:8080/user/" + login + "/rss_channels";
+        });
         console.log("request url: " + request_url);
-        xhttp.open("GET", request_url, true);
-        xhttp.send();
     }
 
     function loadArticlesForLink(link) {
-        var xhttp = new XMLHttpRequest();
-        xhttp.onreadystatechange = function () {
-            if (this.readyState === 4 && this.status === 200) {
-                var articles = JSON.parse(this.responseText)['articles'];
+        var request_url = "http://localhost:8080/articles/by_rss_link?link=" + link;
+        $.ajax({
+            type: "GET",
+            url: request_url,
+            success: function (data) {
+                var articles = JSON.parse(data)['articles'];
                 var articles_container = document.getElementById("articles_container");
                 articles_container.innerHTML = '';
                 for (var i = 0; i < articles.length; i++) {
@@ -207,12 +213,12 @@
                     defineOnclick(article);
                     articles_container.appendChild(btn)
                 }
+            },
+            error: function (error) {
+                alert("Due to unexpected errors we were unable to load data");
             }
-        };
-        var request_url = "http://localhost:8080/articles/by_rss_link?link=" + link;
+        });
         console.log("request url: " + request_url);
-        xhttp.open("GET", request_url, true);
-        xhttp.send();
     }
 </script>
 
