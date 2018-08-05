@@ -16,9 +16,10 @@
 package rss.reader;
 
 import com.datastax.driver.core.PreparedStatement;
+import io.reactivex.Completable;
+import io.vertx.core.Future;
 import io.vertx.reactivex.cassandra.CassandraClient;
 import io.vertx.reactivex.core.AbstractVerticle;
-import io.vertx.core.Future;
 import io.vertx.reactivex.ext.web.client.WebClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,34 +41,30 @@ public class FetchVerticle extends AbstractVerticle {
         webClient = WebClient.create(vertx);
         cassandraClient = CassandraClient.createShared(vertx);
         startFetchEventBusConsumer();
-        prepareNecessaryQueries().setHandler(startFuture);
+        prepareNecessaryQueries().subscribe(startFuture::complete, startFuture::fail);
     }
 
     private void startFetchEventBusConsumer() {
         vertx.eventBus().localConsumer("fetch.rss.link", message -> {
             String rssLink = (String) message.body();
             log.info("fetching " + rssLink);
-            webClient.getAbs(rssLink).send(response -> {
-                if (response.succeeded()) {
-                    String bodyAsString = response.result().bodyAsString("UTF-8");
-                    try {
-                        RssChannel rssChannel = new RssChannel(bodyAsString);
+            webClient.getAbs(rssLink).rxSend()
+                    .subscribe(response -> {
+                        String bodyAsString = response.bodyAsString("UTF-8");
+                        try {
+                            RssChannel rssChannel = new RssChannel(bodyAsString);
 
-                        // TODO STEP 1
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                        message.reply(FetchStatus.FAIL);
-                    }
-                } else {
-                    message.reply(FetchStatus.FAIL);
-                }
-            });
+                            // TODO STEP 1
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                            message.reply(FetchStatus.FAIL);
+                        }
+                    }, e -> log.error("Unable to fetch " + rssLink, e));
         });
     }
 
-
-    private Future<Void> prepareNecessaryQueries() {
+    private Completable prepareNecessaryQueries() {
         // TODO STEP 1
-        return Future.succeededFuture();
+        return Completable.complete();
     }
 }
