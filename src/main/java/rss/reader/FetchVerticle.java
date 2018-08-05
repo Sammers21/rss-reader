@@ -16,10 +16,10 @@
 package rss.reader;
 
 import com.datastax.driver.core.PreparedStatement;
-import io.vertx.cassandra.CassandraClient;
-import io.vertx.core.AbstractVerticle;
+import io.vertx.reactivex.cassandra.CassandraClient;
+import io.vertx.reactivex.core.AbstractVerticle;
 import io.vertx.core.Future;
-import io.vertx.ext.web.client.WebClient;
+import io.vertx.reactivex.ext.web.client.WebClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import rss.reader.parsing.RssChannel;

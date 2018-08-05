@@ -15,11 +15,11 @@
  */
 package rss.reader;
 
-import io.vertx.core.Vertx;
+import io.vertx.reactivex.core.Vertx;
 
 public class Main {
     public static void main(String[] args) {
         Vertx vertx = Vertx.vertx();
-        vertx.deployVerticle(new AppVerticle());
+        vertx.deployVerticle(AppVerticle.class.getName());
     }
 }

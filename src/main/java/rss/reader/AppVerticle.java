@@ -16,16 +16,19 @@
 package rss.reader;
 
 import com.datastax.driver.core.PreparedStatement;
-import io.vertx.cassandra.CassandraClient;
+import io.reactivex.Completable;
+import io.reactivex.Maybe;
+import io.reactivex.Single;
 import io.vertx.cassandra.CassandraClientOptions;
-import io.vertx.cassandra.ResultSet;
-import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Future;
-import io.vertx.core.buffer.Buffer;
-import io.vertx.core.http.HttpServer;
-import io.vertx.ext.web.Router;
-import io.vertx.ext.web.RoutingContext;
-import io.vertx.ext.web.handler.StaticHandler;
+import io.vertx.reactivex.cassandra.CassandraClient;
+import io.vertx.reactivex.cassandra.ResultSet;
+import io.vertx.reactivex.core.AbstractVerticle;
+import io.vertx.reactivex.core.buffer.Buffer;
+import io.vertx.reactivex.core.http.HttpServer;
+import io.vertx.reactivex.ext.web.Router;
+import io.vertx.reactivex.ext.web.RoutingContext;
+import io.vertx.reactivex.ext.web.handler.StaticHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,52 +42,59 @@ public class AppVerticle extends AbstractVerticle {
 
     private CassandraClient client;
 
+    // TODO initialize on step 1
     private PreparedStatement insertNewLinkForUser;
 
     @Override
     public void start(Future<Void> startFuture) {
-        client = CassandraClient.createShared(vertx, new CassandraClientOptions().addContactPoint(CASSANDRA_HOST).setPort(CASSANDRA_PORT));
-        Future<Void> future = Future.future();
-        client.connect(future);
-        future.compose(connected -> initKeyspaceIfNotExist())
-                .compose(keySpacesInitialized -> prepareNecessaryQueries())
-                .compose(all -> {
-                    Future<String> deployed = Future.future();
-                    vertx.deployVerticle(new FetchVerticle(), deployed);
-                    return deployed;
+        CassandraClientOptions options = new CassandraClientOptions()
+                .addContactPoint(CASSANDRA_HOST)
+                .setPort(CASSANDRA_PORT);
+
+        client = CassandraClient.createShared(vertx, options);
+        client.rxConnect()
+                .compose(connected -> {
+                    log.info("Connected to Cassandra");
+                    return initKeyspaceIfNotExist();
                 })
-                .compose(deployed -> startHttpServer(), startFuture);
+                .compose(initialized -> {
+                    log.info("Keyspace initialized");
+                    return prepareNecessaryQueries();
+                })
+                .compose(prepared -> {
+                    log.info("Necessary queries are prepared");
+                    return vertx.rxDeployVerticle(FetchVerticle.class.getName()).toCompletable();
+                })
+                .compose(deployed -> {
+                    log.info("Fetch verticle deployed");
+                    return startHttpServer();
+                })
+                .subscribe(startFuture::complete, startFuture::fail);
     }
 
-    private Future<Void> initKeyspaceIfNotExist() {
-        Future<Buffer> readFileFuture = Future.future();
-        vertx.fileSystem().readFile("schema.cql", readFileFuture);
-        return readFileFuture.compose(file -> {
+    private Completable initKeyspaceIfNotExist() {
+        Single<Buffer> file = vertx.fileSystem().rxReadFile("schema.cql");
+        return file.flatMap(content -> {
             String[] statements = file.toString().split("\n");
-            Future<ResultSet> result = Future.succeededFuture();
+            Maybe<ResultSet> maybe = Maybe.empty();
             for (String statement : statements) {
-                result = result.compose(f -> {
-                    Future<ResultSet> executionQueryFuture = Future.future();
-                    client.execute(statement, executionQueryFuture);
-                    return executionQueryFuture;
-                });
+                maybe = maybe.flatMap(prev -> client.rxExecute(statement).toMaybe());
             }
-            return result;
-        }).mapEmpty();
+            return maybe.toSingle();
+        }).toCompletable();
     }
 
-    private Future<Void> prepareNecessaryQueries() {
+    private Completable prepareNecessaryQueries() {
         // TODO STEP 1
-        return Future.succeededFuture();
+        return Completable.complete();
     }
 
-    @SuppressWarnings("UnusedReturnValue")
-    private Future<HttpServer> startHttpServer() {
+    private Completable startHttpServer() {
         HttpServer server = vertx.createHttpServer();
         Router router = Router.router(vertx);
 
-        router.route().handler(ctx->{
-            ctx.response().putHeader("Access-Control-Allow-Origin","*");
+        router.route().handler(ctx -> {
+            ctx.response().putHeader("Access-Control-Allow-Origin", "*");
             ctx.next();
         });
 
@@ -93,9 +103,7 @@ public class AppVerticle extends AbstractVerticle {
         router.get("/articles/by_rss_link").handler(this::getArticles);
         router.get("/").handler(StaticHandler.create());
 
-        Future<HttpServer> serverStarted = Future.future();
-        server.requestHandler(router).listen(APP_PORT, serverStarted);
-        return serverStarted;
+        return server.requestHandler(router).rxListen(APP_PORT).toCompletable();
     }
 
     private void getArticles(RoutingContext ctx) {

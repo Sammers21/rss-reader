@@ -15,6 +15,7 @@ dependencies {
     compile "io.vertx:vertx-cassandra-client:3.6.0-SNAPSHOT"
     compile "io.vertx:vertx-web-client"
     compile "io.vertx:vertx-web"
+    compile "io.vertx:vertx-rx-java2"
     compile group: 'org.slf4j', name: 'slf4j-simple', version: '1.7.21'
     testCompile 'junit:junit:4.12'
 }
