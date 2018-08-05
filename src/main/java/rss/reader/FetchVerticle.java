@@ -56,12 +56,12 @@ public class FetchVerticle extends AbstractVerticle {
 
                             // TODO STEP 1
                         } catch (Exception e) {
-                            e.printStackTrace();
+                            log.error("Unable to handle: " + rssLink);
                             message.reply(FetchStatus.FAIL);
                         }
                     }, e -> {
+                        log.error("Unable to fetch: " + rssLink, e);
                         message.reply(FetchStatus.FAIL);
-                        log.error("Unable to fetch " + rssLink, e);
                     });
         });
     }
