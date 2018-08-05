@@ -4,3 +4,4 @@ out/
 .vertx/
 *.iml
 build/
+vertx-cassandra-client/
