@@ -31,6 +31,7 @@ public class FetchVerticle extends AbstractVerticle {
     private CassandraClient cassandraClient;
     private WebClient webClient;
 
+    // TODO initialize on step 1
     private PreparedStatement insertChannelInfo;
     private PreparedStatement insertArticleInfo;
 
