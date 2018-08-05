@@ -70,16 +70,10 @@ public class FetchVerticle extends AbstractVerticle {
                         Future<ResultSet> insertArticlesFuture = Future.future();
                         cassandraClient.execute(batchStatement, insertArticlesFuture);
 
-                        insertArticlesFuture.compose(insertDone -> {
-                            message.reply(FetchStatus.SUCCESS);
-                            return Future.succeededFuture();
-                        });
+                        insertArticlesFuture.compose(insertDone -> Future.succeededFuture());
                     } catch (Exception e) {
                         e.printStackTrace();
-                        message.reply(FetchStatus.FAIL);
                     }
-                } else {
-                    message.reply(FetchStatus.FAIL);
                 }
             });
         });
