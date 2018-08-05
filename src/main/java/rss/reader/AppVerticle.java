@@ -15,12 +15,14 @@
  */
 package rss.reader;
 
+import com.datastax.driver.core.BoundStatement;
 import com.datastax.driver.core.PreparedStatement;
 import io.reactivex.Completable;
 import io.reactivex.Maybe;
 import io.reactivex.Single;
 import io.vertx.cassandra.CassandraClientOptions;
 import io.vertx.core.Future;
+import io.vertx.core.json.JsonObject;
 import io.vertx.reactivex.cassandra.CassandraClient;
 import io.vertx.reactivex.cassandra.ResultSet;
 import io.vertx.reactivex.core.AbstractVerticle;
@@ -85,8 +87,9 @@ public class AppVerticle extends AbstractVerticle {
     }
 
     private Completable prepareNecessaryQueries() {
-        // TODO STEP 1
-        return Completable.complete();
+        Single<PreparedStatement> rxPrepare = client.rxPrepare("INSERT INTO rss_by_user (login , rss_link ) VALUES ( ?, ?);");
+        rxPrepare.subscribe(preparedStatement -> insertNewLinkForUser = preparedStatement);
+        return rxPrepare.toCompletable();
     }
 
     private Completable startHttpServer() {
@@ -115,6 +118,34 @@ public class AppVerticle extends AbstractVerticle {
     }
 
     private void postRssLink(RoutingContext ctx) {
-        // TODO STEP 1
+        ctx.request().bodyHandler(body -> {
+            JsonObject bodyAsJson = body.toJsonObject();
+            String link = bodyAsJson.getString("link");
+            String userId = ctx.request().getParam("user_id");
+            if (link == null || userId == null) {
+                responseWithInvalidRequest(ctx);
+            } else {
+                vertx.eventBus().send("fetch.rss.link", link);
+                BoundStatement query = insertNewLinkForUser.bind(userId, link);
+                client.rxExecute(query).subscribe(
+                        result -> {
+                            ctx.response().end(new JsonObject().put("message", "The feed just added").toString());
+                        }, error -> {
+                            ctx.response().setStatusCode(400).end(error.getMessage());
+                        }
+                );
+            }
+        });
+    }
+
+    private void responseWithInvalidRequest(RoutingContext ctx) {
+        ctx.response()
+                .setStatusCode(400)
+                .putHeader("content-type", "application/json; charset=utf-8")
+                .end(invalidRequest().toString());
+    }
+
+    private JsonObject invalidRequest() {
+        return new JsonObject().put("message", "Invalid request");
     }
 }
