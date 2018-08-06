@@ -51,7 +51,6 @@ public class FetchVerticle extends AbstractVerticle {
         cassandraClient = CassandraClient.createShared(vertx);
         startFetchEventBusConsumer();
         prepareNecessaryQueries()
-                .toCompletable()
                 .subscribe(startFuture::complete, startFuture::fail);
     }
 
@@ -85,8 +84,11 @@ public class FetchVerticle extends AbstractVerticle {
         });
     }
 
-    private Single prepareNecessaryQueries() {
-        // TODO STEP 1
-        return Single.just(NOTHING);
+    private Completable prepareNecessaryQueries() {
+        Single<PreparedStatement> insertChannelInfoStatement = cassandraClient.rxPrepare("INSERT INTO channel_info_by_rss_link ( rss_link , last_fetch_time, description , site_link , title ) VALUES (?, ?, ?, ?, ?);");
+        insertChannelInfoStatement.subscribe(preparedStatement -> insertChannelInfo = preparedStatement);
+        Single<PreparedStatement> insertArticleInfoStatement = cassandraClient.rxPrepare("INSERT INTO articles_by_rss_link ( rss_link , pubdate , article_link , description , title ) VALUES ( ?, ?, ?, ?, ?);");
+        insertArticleInfoStatement.subscribe(preparedStatement -> insertArticleInfo = preparedStatement);
+        return Completable.concatArray(insertArticleInfoStatement.toCompletable(), insertChannelInfoStatement.toCompletable());
     }
 }
