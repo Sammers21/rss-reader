@@ -52,6 +52,7 @@ public class AppVerticle extends AbstractVerticle {
     private PreparedStatement selectChannelInfo;
     private PreparedStatement selectRssLinksByLogin;
     private PreparedStatement insertNewLinkForUser;
+    private PreparedStatement selectArticlesByRssLink;
 
     @Override
     public void start(Future<Void> startFuture) {
@@ -97,13 +98,17 @@ public class AppVerticle extends AbstractVerticle {
         Single<PreparedStatement> insertLoginWithLoginStatement = client.rxPrepare("INSERT INTO rss_by_user (login , rss_link ) VALUES ( ?, ?);");
         Single<PreparedStatement> selectChannelInfoByLinkStatement = client.rxPrepare("SELECT description, title, site_link, rss_link FROM channel_info_by_rss_link WHERE rss_link = ? ;");
         Single<PreparedStatement> selectRssLinksByLoginStatement = client.rxPrepare("SELECT rss_link FROM rss_by_user WHERE login = ? ;");
+        Single<PreparedStatement> selectArticlesByRssLinkStatement = client.rxPrepare("SELECT title, article_link, description, pubDate FROM articles_by_rss_link WHERE rss_link = ? ;");
+
         insertLoginWithLoginStatement.subscribe(preparedStatement -> insertNewLinkForUser = preparedStatement);
         selectChannelInfoByLinkStatement.subscribe(preparedStatement -> selectChannelInfo = preparedStatement);
         selectRssLinksByLoginStatement.subscribe(preparedStatement -> selectRssLinksByLogin = preparedStatement);
+        selectArticlesByRssLinkStatement.subscribe(preparedStatement -> selectArticlesByRssLink = preparedStatement);
 
         return insertLoginWithLoginStatement
                 .compose(one -> selectChannelInfoByLinkStatement)
-                .compose(another -> selectRssLinksByLoginStatement);
+                .compose(another -> selectRssLinksByLoginStatement)
+                .compose(another -> selectArticlesByRssLinkStatement);
     }
 
     private Single startHttpServer() {
@@ -124,7 +129,31 @@ public class AppVerticle extends AbstractVerticle {
     }
 
     private void getArticles(RoutingContext ctx) {
-        // TODO STEP 3
+        String link = ctx.request().getParam("link");
+        if (link == null) {
+            responseWithInvalidRequest(ctx);
+        } else {
+            client.rxExecuteWithFullFetch(selectArticlesByRssLink.bind(link)).subscribe(
+                    rows -> {
+                        JsonObject responseJson = new JsonObject();
+                        JsonArray articles = new JsonArray();
+
+                        rows.forEach(eachRow -> articles.add(
+                                new JsonObject()
+                                        .put("title", eachRow.getString(0))
+                                        .put("link", eachRow.getString(1))
+                                        .put("description", eachRow.getString(2))
+                                        .put("pub_date", eachRow.getTimestamp(3).getTime())
+                        ));
+
+                        responseJson.put("articles", articles);
+                        ctx.response().end(responseJson.toString());
+                    }, error -> {
+                        log.error("failed to get articles for " + link, error);
+                        ctx.response().setStatusCode(500).end("Unable to retrieve the info from C*");
+                    }
+            );
+        }
     }
 
     private void getRssChannels(RoutingContext ctx) {
