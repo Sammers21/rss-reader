@@ -17,6 +17,7 @@ package rss.reader;
 
 import com.datastax.driver.core.PreparedStatement;
 import io.reactivex.Completable;
+import io.reactivex.Single;
 import io.vertx.core.Future;
 import io.vertx.reactivex.cassandra.CassandraClient;
 import io.vertx.reactivex.core.AbstractVerticle;
@@ -25,6 +26,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import rss.reader.parsing.RssChannel;
 
+import static rss.reader.AppVerticle.NOTHING;
+
+@SuppressWarnings("unchecked")
 public class FetchVerticle extends AbstractVerticle {
 
     private static final Logger log = LoggerFactory.getLogger(FetchVerticle.class);
@@ -41,7 +45,9 @@ public class FetchVerticle extends AbstractVerticle {
         webClient = WebClient.create(vertx);
         cassandraClient = CassandraClient.createShared(vertx);
         startFetchEventBusConsumer();
-        prepareNecessaryQueries().subscribe(startFuture::complete, startFuture::fail);
+        prepareNecessaryQueries()
+                .toCompletable()
+                .subscribe(startFuture::complete, startFuture::fail);
     }
 
     private void startFetchEventBusConsumer() {
@@ -64,8 +70,8 @@ public class FetchVerticle extends AbstractVerticle {
         });
     }
 
-    private Completable prepareNecessaryQueries() {
+    private Single prepareNecessaryQueries() {
         // TODO STEP 1
-        return Completable.complete();
+        return Single.just(NOTHING);
     }
 }

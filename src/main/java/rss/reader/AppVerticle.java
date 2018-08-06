@@ -39,7 +39,7 @@ public class AppVerticle extends AbstractVerticle {
     private final static String CASSANDRA_HOST = "localhost";
     private final static int CASSANDRA_PORT = 9042;
     private final static int APP_PORT = 8080;
-    private final static Object NOTHING = new Object();
+    public final static Object NOTHING = new Object();
 
     private CassandraClient client;
 
