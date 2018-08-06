@@ -17,13 +17,15 @@ package rss.reader;
 
 import com.datastax.driver.core.BoundStatement;
 import com.datastax.driver.core.PreparedStatement;
-import io.reactivex.Maybe;
+import com.datastax.driver.core.Row;
+import io.reactivex.Completable;
+import io.reactivex.Flowable;
 import io.reactivex.Single;
 import io.vertx.cassandra.CassandraClientOptions;
 import io.vertx.core.Future;
+import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.reactivex.cassandra.CassandraClient;
-import io.vertx.reactivex.cassandra.ResultSet;
 import io.vertx.reactivex.core.AbstractVerticle;
 import io.vertx.reactivex.core.buffer.Buffer;
 import io.vertx.reactivex.core.http.HttpServer;
@@ -32,6 +34,9 @@ import io.vertx.reactivex.ext.web.RoutingContext;
 import io.vertx.reactivex.ext.web.handler.StaticHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.List;
+import java.util.stream.Collectors;
 
 @SuppressWarnings("unchecked")
 public class AppVerticle extends AbstractVerticle {
@@ -45,7 +50,10 @@ public class AppVerticle extends AbstractVerticle {
 
     private CassandraClient client;
 
+    private PreparedStatement selectChannelInfo;
+    private PreparedStatement selectRssLinksByLogin;
     private PreparedStatement insertNewLinkForUser;
+    private PreparedStatement selectArticlesByRssLink;
 
     @Override
     public void start(Future<Void> startFuture) {
@@ -88,9 +96,16 @@ public class AppVerticle extends AbstractVerticle {
     }
 
     private Single prepareNecessaryQueries() {
-        Single<PreparedStatement> rxPrepare = client.rxPrepare("INSERT INTO rss_by_user (login , rss_link ) VALUES ( ?, ?);");
-        rxPrepare.subscribe(preparedStatement -> insertNewLinkForUser = preparedStatement);
-        return rxPrepare;
+        Single<PreparedStatement> insertLoginWithLoginStatement = client.rxPrepare("INSERT INTO rss_by_user (login , rss_link ) VALUES ( ?, ?);");
+        Single<PreparedStatement> selectChannelInfoByLinkStatement = client.rxPrepare("SELECT description, title, site_link, rss_link FROM channel_info_by_rss_link WHERE rss_link = ? ;");
+        Single<PreparedStatement> selectRssLinksByLoginStatement = client.rxPrepare("SELECT rss_link FROM rss_by_user WHERE login = ? ;");
+        insertLoginWithLoginStatement.subscribe(preparedStatement -> insertNewLinkForUser = preparedStatement);
+        selectChannelInfoByLinkStatement.subscribe(preparedStatement -> selectChannelInfo = preparedStatement);
+        selectRssLinksByLoginStatement.subscribe(preparedStatement -> selectRssLinksByLogin = preparedStatement);
+
+        return insertLoginWithLoginStatement
+                .compose(one -> selectChannelInfoByLinkStatement)
+                .compose(another -> selectRssLinksByLoginStatement);
     }
 
     private Single startHttpServer() {
@@ -115,7 +130,40 @@ public class AppVerticle extends AbstractVerticle {
     }
 
     private void getRssChannels(RoutingContext ctx) {
-        // TODO STEP 2
+        String userId = ctx.request().getParam("user_id");
+        if (userId == null) {
+            responseWithInvalidRequest(ctx);
+        } else {
+            Single<List<Row>> fullFetch = client.rxExecuteWithFullFetch(selectRssLinksByLogin.bind(userId));
+            fullFetch.flattenAsFlowable(rows -> {
+                List<String> links = rows.stream()
+                        .map(row -> row.getString(0))
+                        .collect(Collectors.toList());
+                return links.stream().map(selectChannelInfo::bind).map(
+                        statement -> client.rxExecuteWithFullFetch(statement)
+                ).collect(Collectors.toList());
+            }).flatMapSingle(signleOfRows -> signleOfRows)
+                    .flatMap(Flowable::fromIterable)
+                    .toList()
+                    .subscribe(listOfRows -> {
+                        JsonObject responseJson = new JsonObject();
+                        JsonArray channels = new JsonArray();
+
+                        listOfRows.forEach(eachRow -> channels.add(
+                                new JsonObject()
+                                        .put("description", eachRow.getString(0))
+                                        .put("title", eachRow.getString(1))
+                                        .put("link", eachRow.getString(2))
+                                        .put("rss_link", eachRow.getString(3))
+                        ));
+
+                        responseJson.put("channels", channels);
+                        ctx.response().end(responseJson.toString());
+                    }, error -> {
+                        log.error("failed to get rss channels", error);
+                        ctx.response().setStatusCode(500).end("Unable to retrieve the info from C*");
+                    });
+        }
     }
 
     private void postRssLink(RoutingContext ctx) {
