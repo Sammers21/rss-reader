@@ -53,7 +53,6 @@ public class AppVerticle extends AbstractVerticle {
     private PreparedStatement selectChannelInfo;
     private PreparedStatement selectRssLinksByLogin;
     private PreparedStatement insertNewLinkForUser;
-    private PreparedStatement selectArticlesByRssLink;
 
     @Override
     public void start(Future<Void> startFuture) {
