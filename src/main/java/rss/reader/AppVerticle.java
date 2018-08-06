@@ -18,7 +18,6 @@ package rss.reader;
 import com.datastax.driver.core.BoundStatement;
 import com.datastax.driver.core.PreparedStatement;
 import com.datastax.driver.core.Row;
-import io.reactivex.Completable;
 import io.reactivex.Flowable;
 import io.reactivex.Single;
 import io.vertx.cassandra.CassandraClientOptions;
@@ -141,7 +140,7 @@ public class AppVerticle extends AbstractVerticle {
                 return links.stream().map(selectChannelInfo::bind).map(
                         statement -> client.rxExecuteWithFullFetch(statement)
                 ).collect(Collectors.toList());
-            }).flatMapSingle(signleOfRows -> signleOfRows)
+            }).flatMapSingle(singleOfRows -> singleOfRows)
                     .flatMap(Flowable::fromIterable)
                     .toList()
                     .subscribe(listOfRows -> {
