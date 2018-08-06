@@ -45,7 +45,6 @@ public class AppVerticle extends AbstractVerticle {
 
     private CassandraClient client;
 
-    // TODO initialize on step 1
     private PreparedStatement insertNewLinkForUser;
 
     @Override

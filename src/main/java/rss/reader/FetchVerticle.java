@@ -15,6 +15,8 @@
  */
 package rss.reader;
 
+import com.datastax.driver.core.BatchStatement;
+import com.datastax.driver.core.BoundStatement;
 import com.datastax.driver.core.PreparedStatement;
 import io.reactivex.Completable;
 import io.vertx.core.Future;
@@ -23,7 +25,10 @@ import io.vertx.reactivex.core.AbstractVerticle;
 import io.vertx.reactivex.ext.web.client.WebClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import rss.reader.parsing.Article;
 import rss.reader.parsing.RssChannel;
+
+import java.util.Date;
 
 public class FetchVerticle extends AbstractVerticle {
 
@@ -53,8 +58,18 @@ public class FetchVerticle extends AbstractVerticle {
                         String bodyAsString = response.bodyAsString("UTF-8");
                         try {
                             RssChannel rssChannel = new RssChannel(bodyAsString);
-
-                            // TODO STEP 1
+                            BatchStatement batchStatement = new BatchStatement();
+                            BoundStatement channelInfoInsertQuery = insertChannelInfo.bind(
+                                    rssLink, new Date(System.currentTimeMillis()), rssChannel.description, rssChannel.link, rssChannel.title
+                            );
+                            batchStatement.add(channelInfoInsertQuery);
+                            for (Article article : rssChannel.articles) {
+                                batchStatement.add(insertArticleInfo.bind(rssLink, article.pubDate, article.link, article.description, article.title));
+                            }
+                            cassandraClient.rxExecute(batchStatement).subscribe(
+                                    done -> log.info("Storage have just been updated with entries from: " + rssLink),
+                                    error -> log.error("Unable to update storage with entities fetched from " + rssLink, error)
+                            );
                         } catch (Exception e) {
                             log.error("Unable to handle: " + rssLink);
                         }
