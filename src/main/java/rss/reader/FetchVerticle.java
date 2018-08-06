@@ -74,7 +74,7 @@ public class FetchVerticle extends AbstractVerticle {
                             }
                             cassandraClient.rxExecute(batchStatement).subscribe(
                                     done -> log.info("Storage have just been updated with entries from: " + rssLink),
-                                    error -> log.error("Unable to update storage with entities fetched from " + rssLink, error)
+                                    error -> log.error("Unable to update storage with entities fetched from: " + rssLink, error)
                             );
                         } catch (Exception e) {
                             log.error("Unable to handle: " + rssLink);
