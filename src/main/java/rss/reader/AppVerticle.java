@@ -17,7 +17,6 @@ package rss.reader;
 
 import com.datastax.driver.core.BoundStatement;
 import com.datastax.driver.core.PreparedStatement;
-import io.reactivex.Completable;
 import io.reactivex.Maybe;
 import io.reactivex.Single;
 import io.vertx.cassandra.CassandraClientOptions;
@@ -34,6 +33,7 @@ import io.vertx.reactivex.ext.web.handler.StaticHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@SuppressWarnings("unchecked")
 public class AppVerticle extends AbstractVerticle {
 
     private static final Logger log = LoggerFactory.getLogger(AppVerticle.class);
@@ -41,6 +41,7 @@ public class AppVerticle extends AbstractVerticle {
     private final static String CASSANDRA_HOST = "localhost";
     private final static int CASSANDRA_PORT = 9042;
     private final static int APP_PORT = 8080;
+    private final static Object NOTHING = new Object();
 
     private CassandraClient client;
 
@@ -54,45 +55,46 @@ public class AppVerticle extends AbstractVerticle {
                 .setPort(CASSANDRA_PORT);
 
         client = CassandraClient.createShared(vertx, options);
-        client.rxConnect()
-                .compose(connected -> {
+        client.rxConnect().toSingleDefault(NOTHING)
+                .flatMap(connected -> {
                     log.info("Connected to Cassandra");
                     return initKeyspaceIfNotExist();
                 })
-                .compose(initialized -> {
+                .flatMap(initialized -> {
                     log.info("Keyspace initialized");
                     return prepareNecessaryQueries();
                 })
-                .compose(prepared -> {
+                .flatMap(prepared -> {
                     log.info("Necessary queries are prepared");
-                    return vertx.rxDeployVerticle(FetchVerticle.class.getName()).toCompletable();
+                    return vertx.rxDeployVerticle(FetchVerticle.class.getName());
                 })
-                .compose(deployed -> {
+                .flatMap(deployed -> {
                     log.info("Fetch verticle deployed");
                     return startHttpServer();
                 })
+                .toCompletable()
                 .subscribe(startFuture::complete, startFuture::fail);
     }
 
-    private Completable initKeyspaceIfNotExist() {
+    private Single initKeyspaceIfNotExist() {
         Single<Buffer> file = vertx.fileSystem().rxReadFile("schema.cql");
         return file.flatMap(content -> {
-            String[] statements = file.toString().split("\n");
-            Maybe<ResultSet> maybe = Maybe.empty();
+            String[] statements = content.toString().split("\n");
+            Single single = Single.just(NOTHING);
             for (String statement : statements) {
-                maybe = maybe.flatMap(prev -> client.rxExecute(statement).toMaybe());
+                single = single.flatMap(prev -> client.rxExecute(statement));
             }
-            return maybe.toSingle();
-        }).toCompletable();
+            return single;
+        });
     }
 
-    private Completable prepareNecessaryQueries() {
+    private Single prepareNecessaryQueries() {
         Single<PreparedStatement> rxPrepare = client.rxPrepare("INSERT INTO rss_by_user (login , rss_link ) VALUES ( ?, ?);");
         rxPrepare.subscribe(preparedStatement -> insertNewLinkForUser = preparedStatement);
-        return rxPrepare.toCompletable();
+        return rxPrepare;
     }
 
-    private Completable startHttpServer() {
+    private Single startHttpServer() {
         HttpServer server = vertx.createHttpServer();
         Router router = Router.router(vertx);
 
@@ -106,7 +108,7 @@ public class AppVerticle extends AbstractVerticle {
         router.get("/articles/by_rss_link").handler(this::getArticles);
         router.get("/").handler(StaticHandler.create());
 
-        return server.requestHandler(router).rxListen(APP_PORT).toCompletable();
+        return server.requestHandler(router).rxListen(APP_PORT);
     }
 
     private void getArticles(RoutingContext ctx) {
