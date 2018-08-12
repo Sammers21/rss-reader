@@ -83,8 +83,8 @@ public class AppVerticle extends AbstractVerticle {
         HttpServer server = vertx.createHttpServer();
         Router router = Router.router(vertx);
 
-        router.route().handler(ctx->{
-            ctx.response().putHeader("Access-Control-Allow-Origin","*");
+        router.route().handler(ctx -> {
+            ctx.response().putHeader("Access-Control-Allow-Origin", "*");
             ctx.next();
         });
 
