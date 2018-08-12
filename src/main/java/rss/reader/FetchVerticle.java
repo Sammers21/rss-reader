@@ -24,6 +24,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import rss.reader.parsing.RssChannel;
 
+@SuppressWarnings("unchecked")
 public class FetchVerticle extends AbstractVerticle {
 
     private static final Logger log = LoggerFactory.getLogger(FetchVerticle.class);
@@ -54,11 +55,10 @@ public class FetchVerticle extends AbstractVerticle {
 
                         // TODO STEP 1
                     } catch (Exception e) {
-                        e.printStackTrace();
-                        message.reply(FetchStatus.FAIL);
+                        log.error("Unable to fetch: " + rssLink, e);
                     }
                 } else {
-                    message.reply(FetchStatus.FAIL);
+                    log.error("Unable to fetch: " + rssLink);
                 }
             });
         });
