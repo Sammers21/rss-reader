@@ -15,6 +15,7 @@
  */
 package rss.reader;
 
+import com.datastax.driver.core.BoundStatement;
 import com.datastax.driver.core.PreparedStatement;
 import io.vertx.cassandra.CassandraClient;
 import io.vertx.cassandra.CassandraClientOptions;
@@ -23,6 +24,7 @@ import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Future;
 import io.vertx.core.buffer.Buffer;
 import io.vertx.core.http.HttpServer;
+import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
 import io.vertx.ext.web.handler.StaticHandler;
@@ -74,8 +76,13 @@ public class AppVerticle extends AbstractVerticle {
     }
 
     private Future<Void> prepareNecessaryQueries() {
-        // TODO STEP 1
-        return Future.succeededFuture();
+        Future<PreparedStatement> insertNewLinkForUserPrepFuture = Future.future();
+        client.prepare("INSERT INTO rss_by_user (login , rss_link ) VALUES ( ?, ?);", insertNewLinkForUserPrepFuture);
+
+        return insertNewLinkForUserPrepFuture.compose(preparedStatement -> {
+            insertNewLinkForUser = preparedStatement;
+            return Future.succeededFuture();
+        });
     }
 
     @SuppressWarnings("UnusedReturnValue")
@@ -107,6 +114,36 @@ public class AppVerticle extends AbstractVerticle {
     }
 
     private void postRssLink(RoutingContext ctx) {
-        // TODO STEP 1
+        ctx.request().bodyHandler(body -> {
+            JsonObject bodyAsJson = body.toJsonObject();
+            String link = bodyAsJson.getString("link");
+            String userId = ctx.request().getParam("user_id");
+            if (link == null || userId == null) {
+                responseWithInvalidRequest(ctx);
+            } else {
+                vertx.eventBus().send("fetch.rss.link", link);
+                Future<ResultSet> future = Future.future();
+                BoundStatement query = insertNewLinkForUser.bind(userId, link);
+                client.execute(query, future);
+                future.setHandler(result -> {
+                    if (result.succeeded()) {
+                        ctx.response().end(new JsonObject().put("message", "The feed just added").toString());
+                    } else {
+                        ctx.response().setStatusCode(400).end(result.cause().getMessage());
+                    }
+                });
+            }
+        });
+    }
+
+    private void responseWithInvalidRequest(RoutingContext ctx) {
+        ctx.response()
+                .setStatusCode(400)
+                .putHeader("content-type", "application/json; charset=utf-8")
+                .end(invalidRequest().toString());
+    }
+
+    private JsonObject invalidRequest() {
+        return new JsonObject().put("message", "Invalid request");
     }
 }
