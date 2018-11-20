@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/Sammers21/rss-reader.svg?branch=master)](https://travis-ci.org/Sammers21/rss-reader)
+
 # Rss-reader
 
 This is the demo of how you can use [vertx-cassandra-client](https://github.com/Sammers21/vertx-cassandra-client) by real example.
