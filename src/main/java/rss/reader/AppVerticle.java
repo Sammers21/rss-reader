@@ -35,6 +35,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 public class AppVerticle extends AbstractVerticle {
@@ -47,10 +48,10 @@ public class AppVerticle extends AbstractVerticle {
 
     private CassandraClient client;
 
-    private PreparedStatement selectChannelInfo;
-    private PreparedStatement selectRssLinksByLogin;
-    private PreparedStatement insertNewLinkForUser;
-    private PreparedStatement selectArticlesByRssLink;
+    private AtomicReference<PreparedStatement> selectChannelInfo = new AtomicReference<>();
+    private AtomicReference<PreparedStatement> selectRssLinksByLogin = new AtomicReference<>();
+    private AtomicReference<PreparedStatement> insertNewLinkForUser = new AtomicReference<>();
+    private AtomicReference<PreparedStatement> selectArticlesByRssLink = new AtomicReference<>();
 
     @Override
     public void start(Future<Void> startFuture) {
@@ -85,36 +86,40 @@ public class AppVerticle extends AbstractVerticle {
     }
 
     private Future<Void> prepareNecessaryQueries() {
-        Future<PreparedStatement> selectChannelInfoPrepFuture = Future.future();
-        client.prepare("SELECT description, title, site_link, rss_link FROM channel_info_by_rss_link WHERE rss_link = ? ;", selectChannelInfoPrepFuture);
-
-        Future<PreparedStatement> selectRssLinkByLoginPrepFuture = Future.future();
-        client.prepare("SELECT rss_link FROM rss_by_user WHERE login = ? ;", selectRssLinkByLoginPrepFuture);
-
-        Future<PreparedStatement> insertNewLinkForUserPrepFuture = Future.future();
-        client.prepare("INSERT INTO rss_by_user (login , rss_link ) VALUES ( ?, ?);", insertNewLinkForUserPrepFuture);
-
-        Future<PreparedStatement> selectArticlesByRssLinkPrepFuture = Future.future();
-        client.prepare("SELECT title, article_link, description, pubDate FROM articles_by_rss_link WHERE rss_link = ? ;", selectArticlesByRssLinkPrepFuture);
-
         return CompositeFuture.all(
-                selectChannelInfoPrepFuture.compose(preparedStatement -> {
-                    selectChannelInfo = preparedStatement;
-                    return Future.succeededFuture();
-                }),
-                selectRssLinkByLoginPrepFuture.compose(preparedStatement -> {
-                    selectRssLinksByLogin = preparedStatement;
-                    return Future.succeededFuture();
-                }),
-                insertNewLinkForUserPrepFuture.compose(preparedStatement -> {
-                    insertNewLinkForUser = preparedStatement;
-                    return Future.succeededFuture();
-                }),
-                selectArticlesByRssLinkPrepFuture.compose(preparedStatement -> {
-                    selectArticlesByRssLink = preparedStatement;
-                    return Future.succeededFuture();
-                })
+                prepareSelectChannelInfo(),
+                prepareSelectRssLinksByLogin(),
+                prepareInsertNewLinkForUser(),
+                prepareSelectArticlesByRssLink()
         ).mapEmpty();
+    }
+
+    private Future<Void> prepareSelectChannelInfo() {
+        return Util.prepareQueryAndSetReference(client,
+                "SELECT description, title, site_link, rss_link FROM channel_info_by_rss_link WHERE rss_link = ? ;",
+                selectChannelInfo
+        );
+    }
+
+    private Future<Void> prepareSelectRssLinksByLogin() {
+        return Util.prepareQueryAndSetReference(client,
+                "SELECT rss_link FROM rss_by_user WHERE login = ? ;",
+                selectRssLinksByLogin
+        );
+    }
+
+    private Future<Void> prepareInsertNewLinkForUser() {
+        return Util.prepareQueryAndSetReference(client,
+                "INSERT INTO rss_by_user (login , rss_link ) VALUES ( ?, ?);",
+                insertNewLinkForUser
+        );
+    }
+
+    private Future<Void> prepareSelectArticlesByRssLink() {
+        return Util.prepareQueryAndSetReference(client,
+                "SELECT title, article_link, description, pubDate FROM articles_by_rss_link WHERE rss_link = ? ;",
+                selectArticlesByRssLink
+        );
     }
 
     @SuppressWarnings("UnusedReturnValue")
@@ -122,8 +127,8 @@ public class AppVerticle extends AbstractVerticle {
         HttpServer server = vertx.createHttpServer();
         Router router = Router.router(vertx);
 
-        router.route().handler(ctx->{
-            ctx.response().putHeader("Access-Control-Allow-Origin","*");
+        router.route().handler(ctx -> {
+            ctx.response().putHeader("Access-Control-Allow-Origin", "*");
             ctx.next();
         });
 
@@ -142,7 +147,7 @@ public class AppVerticle extends AbstractVerticle {
         if (link == null) {
             responseWithInvalidRequest(ctx);
         } else {
-            client.executeWithFullFetch(selectArticlesByRssLink.bind(link), handler -> {
+            client.executeWithFullFetch(selectArticlesByRssLink.get().bind(link), handler -> {
                 if (handler.succeeded()) {
                     List<Row> rows = handler.result();
 
@@ -173,14 +178,14 @@ public class AppVerticle extends AbstractVerticle {
             responseWithInvalidRequest(ctx);
         } else {
             Future<List<Row>> future = Future.future();
-            client.executeWithFullFetch(selectRssLinksByLogin.bind(userId), future);
+            client.executeWithFullFetch(selectRssLinksByLogin.get().bind(userId), future);
             future.compose(rows -> {
                 List<String> links = rows.stream()
                         .map(row -> row.getString(0))
                         .collect(Collectors.toList());
 
                 return CompositeFuture.all(
-                        links.stream().map(selectChannelInfo::bind).map(statement -> {
+                        links.stream().map(selectChannelInfo.get()::bind).map(statement -> {
                             Future<List<Row>> channelInfoRow = Future.future();
                             client.executeWithFullFetch(statement, channelInfoRow);
                             return channelInfoRow;
@@ -224,7 +229,7 @@ public class AppVerticle extends AbstractVerticle {
             } else {
                 vertx.eventBus().send("fetch.rss.link", link);
                 Future<ResultSet> future = Future.future();
-                BoundStatement query = insertNewLinkForUser.bind(userId, link);
+                BoundStatement query = insertNewLinkForUser.get().bind(userId, link);
                 client.execute(query, future);
                 future.setHandler(result -> {
                     if (result.succeeded()) {

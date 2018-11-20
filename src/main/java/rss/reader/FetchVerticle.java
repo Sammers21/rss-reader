@@ -30,6 +30,7 @@ import rss.reader.parsing.Article;
 import rss.reader.parsing.RssChannel;
 
 import java.util.Date;
+import java.util.concurrent.atomic.AtomicReference;
 
 public class FetchVerticle extends AbstractVerticle {
 
@@ -38,8 +39,8 @@ public class FetchVerticle extends AbstractVerticle {
     private CassandraClient cassandraClient;
     private WebClient webClient;
 
-    private PreparedStatement insertChannelInfo;
-    private PreparedStatement insertArticleInfo;
+    private AtomicReference<PreparedStatement> insertChannelInfo = new AtomicReference<>();
+    private AtomicReference<PreparedStatement> insertArticleInfo = new AtomicReference<>();
 
     @Override
     public void start(Future<Void> startFuture) {
@@ -59,13 +60,13 @@ public class FetchVerticle extends AbstractVerticle {
                     try {
                         RssChannel rssChannel = new RssChannel(bodyAsString);
                         BatchStatement batchStatement = new BatchStatement();
-                        BoundStatement channelInfoInsertQuery = insertChannelInfo.bind(
+                        BoundStatement channelInfoInsertQuery = insertChannelInfo.get().bind(
                                 rssLink, new Date(System.currentTimeMillis()), rssChannel.description, rssChannel.link, rssChannel.title
                         );
                         batchStatement.add(channelInfoInsertQuery);
 
-                        for (Article article: rssChannel.articles) {
-                            batchStatement.add(insertArticleInfo.bind(rssLink, article.pubDate, article.link, article.description, article.title));
+                        for (Article article : rssChannel.articles) {
+                            batchStatement.add(insertArticleInfo.get().bind(rssLink, article.pubDate, article.link, article.description, article.title));
                         }
                         Future<ResultSet> insertArticlesFuture = Future.future();
                         cassandraClient.execute(batchStatement, insertArticlesFuture);
@@ -81,20 +82,23 @@ public class FetchVerticle extends AbstractVerticle {
 
 
     private Future<Void> prepareNecessaryQueries() {
-        Future<PreparedStatement> insertChannelInfoPrepFuture = Future.future();
-        cassandraClient.prepare("INSERT INTO channel_info_by_rss_link ( rss_link , last_fetch_time, description , site_link , title ) VALUES (?, ?, ?, ?, ?);", insertChannelInfoPrepFuture);
-
-        Future<PreparedStatement> insertArticleInfoPrepFuture = Future.future();
-        cassandraClient.prepare("INSERT INTO articles_by_rss_link ( rss_link , pubdate , article_link , description , title ) VALUES ( ?, ?, ?, ?, ?);", insertArticleInfoPrepFuture);
-
         return CompositeFuture.all(
-                insertChannelInfoPrepFuture.compose(preparedStatement -> {
-                    insertChannelInfo = preparedStatement;
-                    return Future.succeededFuture();
-                }), insertArticleInfoPrepFuture.compose(preparedStatement -> {
-                    insertArticleInfo = preparedStatement;
-                    return Future.succeededFuture();
-                })
+                prepareInsertArticleInfo(),
+                prepareInsertChannelInfo()
         ).mapEmpty();
+    }
+
+    private Future<Void> prepareInsertChannelInfo() {
+        return Util.prepareQueryAndSetReference(cassandraClient,
+                "INSERT INTO channel_info_by_rss_link ( rss_link , last_fetch_time, description , site_link , title ) VALUES (?, ?, ?, ?, ?);",
+                insertChannelInfo
+        );
+    }
+
+    private Future<Void> prepareInsertArticleInfo() {
+        return Util.prepareQueryAndSetReference(cassandraClient,
+                "INSERT INTO articles_by_rss_link ( rss_link , pubdate , article_link , description , title ) VALUES ( ?, ?, ?, ?, ?);",
+                insertArticleInfo
+        );
     }
 }
