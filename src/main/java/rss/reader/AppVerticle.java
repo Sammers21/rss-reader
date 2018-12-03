@@ -116,10 +116,8 @@ public class AppVerticle extends AbstractVerticle {
     }
 
     private Future<Void> prepareSelectArticlesByRssLink() {
-        return Util.prepareQueryAndSetReference(client,
-                "SELECT title, article_link, description, pubDate FROM articles_by_rss_link WHERE rss_link = ? ;",
-                selectArticlesByRssLink
-        );
+        // TODO: Implement on step 3
+        return Future.future();
     }
 
     @SuppressWarnings("UnusedReturnValue")
@@ -143,33 +141,7 @@ public class AppVerticle extends AbstractVerticle {
     }
 
     private void getArticles(RoutingContext ctx) {
-        String link = ctx.request().getParam("link");
-        if (link == null) {
-            responseWithInvalidRequest(ctx);
-        } else {
-            client.executeWithFullFetch(selectArticlesByRssLink.get().bind(link), handler -> {
-                if (handler.succeeded()) {
-                    List<Row> rows = handler.result();
-
-                    JsonObject responseJson = new JsonObject();
-                    JsonArray articles = new JsonArray();
-
-                    rows.forEach(eachRow -> articles.add(
-                            new JsonObject()
-                                    .put("title", eachRow.getString(0))
-                                    .put("link", eachRow.getString(1))
-                                    .put("description", eachRow.getString(2))
-                                    .put("pub_date", eachRow.getTimestamp(3).getTime())
-                    ));
-
-                    responseJson.put("articles", articles);
-                    ctx.response().end(responseJson.toString());
-                } else {
-                    log.error("failed to get articles for " + link, handler.cause());
-                    ctx.response().setStatusCode(500).end("Unable to retrieve the info from C*");
-                }
-            });
-        }
+        // TODO: Implement on step 3
     }
 
     private void getRssChannels(RoutingContext ctx) {
